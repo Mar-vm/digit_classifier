@@ -4,7 +4,20 @@ import os
 import numpy as np
 from tensorflow.keras.models import load_model
 
+<<<<<<< HEAD
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+=======
+# --- DEBUG TEMPORAL: quitar estas líneas una vez resuelto el problema del modelo ---
+print("CWD:", os.getcwd())
+print("Archivos en la raíz:", os.listdir("."))
+if os.path.exists("model"):
+    print("Archivos en model/:", os.listdir("model"))
+else:
+    print("La carpeta 'model' no existe en este filesystem")
+# --- FIN DEBUG TEMPORAL ---
+
+app = Flask(__name__)
+>>>>>>> 9c39e0c8b9f4294e591d0bc45da1a99d35369ecb
 
 IMG_SIZE = 16  # debe coincidir con el notebook
 
