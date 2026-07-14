@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Reconocedor de dígitos · 16×16</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<style>
+  :root{
+    --paper:#f6f3ea;
+    --ink:#1f2a24;
+    --graphite:#4a5a52;
+    --chalk-green:#2f5d4e;
+    --accent:#c1502e;
+    --line:#d9d2bd;
+    --canvas-bg:#10160f;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0;
+    padding:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Courier New', ui-monospace, monospace;
+    min-height:100vh;
+  }
+
+  body{
+    display:flex;
+    justify-content:center;
+    padding:28px 16px 60px;
+  }
+
+  .sheet{
+    width:100%;
+    max-width:460px;
+  }
+
+  header{
+    border-bottom:2px solid var(--ink);
+    padding-bottom:14px;
+    margin-bottom:22px;
+  }
+
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--graphite);
+    margin:0 0 6px;
+  }
+
+  h1{
+    font-family:Georgia, 'Times New Roman', serif;
+    font-size:28px;
+    margin:0;
+    line-height:1.15;
+    letter-spacing:-.01em;
+  }
+
+  h1 em{
+    font-style:normal;
+    color:var(--accent);
+  }
+
+  .sub{
+    margin:10px 0 0;
+    font-size:13px;
+    color:var(--graphite);
+    line-height:1.5;
+  }
+
+  .stage{
+    position:relative;
+    margin:24px 0 10px;
+  }
+
+  #board{
+    width:100%;
+    aspect-ratio:1/1;
+    background:var(--canvas-bg);
+    border:2px solid var(--ink);
+    border-radius:2px;
+    touch-action:none;
+    display:block;
+    cursor:crosshair;
+  }
+
+  .grid-note{
+    position:absolute;
+    top:8px;
+    left:10px;
+    font-size:10px;
+    letter-spacing:.1em;
+    color:#8fa89b;
+    text-transform:uppercase;
+    pointer-events:none;
+  }
+
+  .controls{
+    display:flex;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  button{
+    font-family:inherit;
+    font-size:13px;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    padding:12px 16px;
+    border-radius:2px;
+    cursor:pointer;
+    border:2px solid var(--ink);
+    background:transparent;
+    color:var(--ink);
+    flex:1;
+    transition:transform .08s ease, background .15s ease, color .15s ease;
+  }
+
+  button:active{ transform:translateY(1px); }
+
+  button.primary{
+    background:var(--ink);
+    color:var(--paper);
+  }
+
+  button:disabled{
+    opacity:.4;
+    cursor:not-allowed;
+  }
+
+  .result{
+    margin-top:24px;
+    border:2px solid var(--ink);
+    border-radius:2px;
+    padding:20px;
+    background:#fff;
+  }
+
+  .result-label{
+    font-size:11px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--graphite);
+    margin:0 0 8px;
+  }
+
+  .result-main{
+    display:flex;
+    align-items:baseline;
+    gap:16px;
+  }
+
+  .digit-big{
+    font-family:Georgia, serif;
+    font-size:64px;
+    line-height:1;
+    color:var(--accent);
+    min-width:64px;
+  }
+
+  .confidence{
+    font-size:13px;
+    color:var(--graphite);
+  }
+
+  .bars{
+    margin-top:18px;
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+  }
+
+  .bar-row{
+    display:grid;
+    grid-template-columns:16px 1fr 40px;
+    align-items:center;
+    gap:8px;
+    font-size:11px;
+    color:var(--graphite);
+  }
+
+  .bar-track{
+    height:8px;
+    background:var(--line);
+    border-radius:1px;
+    overflow:hidden;
+  }
+
+  .bar-fill{
+    height:100%;
+    background:var(--chalk-green);
+    width:0%;
+    transition:width .25s ease;
+  }
+
+  .bar-row.top .bar-fill{ background:var(--accent); }
+  .bar-row.top{ color:var(--ink); font-weight:bold; }
+
+  .status{
+    margin-top:14px;
+    font-size:12px;
+    color:var(--graphite);
+    min-height:16px;
+  }
+
+  footer{
+    margin-top:30px;
+    font-size:11px;
+    color:var(--graphite);
+    border-top:1px solid var(--line);
+    padding-top:14px;
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header>
+    <p class="eyebrow">Modelo · Dense NN · entrada 16×16</p>
+    <h1>Escribe un <em>dígito</em></h1>
+    <p class="sub">Dibuja un número del 0 al 9 en el recuadro. El modelo reduce tu trazo a una imagen de 16×16 en escala de grises, igual que en el entrenamiento, y predice qué dígito escribiste.</p>
+  </header>
+
+  <div class="stage">
+    <span class="grid-note">Lienzo</span>
+    <canvas id="board"></canvas>
+  </div>
+
+  <div class="controls">
+    <button id="clearBtn">Limpiar</button>
+    <button id="predictBtn" class="primary">Predecir</button>
+  </div>
+
+  <p class="status" id="status">Cargando modelo…</p>
+
+  <div class="result" id="resultBox" style="display:none;">
+    <p class="result-label">Predicción</p>
+    <div class="result-main">
+      <div class="digit-big" id="digitBig">—</div>
+      <div class="confidence" id="confidenceText"></div>
+    </div>
+    <div class="bars" id="bars"></div>
+  </div>
+
+  <footer>
+    Modelo entrenado sobre MNIST, redimensionado a 16×16 y normalizado a [0, 1]. Inferencia 100% en el navegador con TensorFlow.js.
+  </footer>
+</div>
+
+<script>
+const IMG_SIZE = 16;
+const MODEL_URL = "model/model.json";
+
+const canvas = document.getElementById("board");
+const ctx = canvas.getContext("2d", { willReadFrequently: true });
+const statusEl = document.getElementById("status");
+const predictBtn = document.getElementById("predictBtn");
+const clearBtn = document.getElementById("clearBtn");
+const resultBox = document.getElementById("resultBox");
+const digitBig = document.getElementById("digitBig");
+const confidenceText = document.getElementById("confidenceText");
+const barsEl = document.getElementById("bars");
+
+let model = null;
+let drawing = false;
+let hasStrokes = false;
+let autoPredictTimer = null;
+
+function resizeCanvasBacking() {
+  const rect = canvas.getBoundingClientRect();
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = rect.width * ratio;
+  canvas.height = rect.height * ratio;
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  paintBackground();
+}
+
+function paintBackground() {
+  const rect = canvas.getBoundingClientRect();
+  ctx.fillStyle = "#10160f";
+  ctx.fillRect(0, 0, rect.width, rect.height);
+  ctx.lineWidth = Math.max(rect.width * 0.09, 14);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#f2efe6";
+}
+
+window.addEventListener("resize", resizeCanvasBacking);
+
+function pointerPos(evt) {
+  const rect = canvas.getBoundingClientRect();
+  const p = evt.touches ? evt.touches[0] : evt;
+  return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+}
+
+function startDraw(evt) {
+  evt.preventDefault();
+  drawing = true;
+  hasStrokes = true;
+  const { x, y } = pointerPos(evt);
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+}
+
+function moveDraw(evt) {
+  if (!drawing) return;
+  evt.preventDefault();
+  const { x, y } = pointerPos(evt);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+}
+
+function endDraw(evt) {
+  if (!drawing) return;
+  drawing = false;
+  scheduleAutoPredict();
+}
+
+["mousedown", "touchstart"].forEach(e => canvas.addEventListener(e, startDraw, { passive: false }));
+["mousemove", "touchmove"].forEach(e => canvas.addEventListener(e, moveDraw, { passive: false }));
+["mouseup", "mouseleave", "touchend", "touchcancel"].forEach(e => canvas.addEventListener(e, endDraw));
+
+clearBtn.addEventListener("click", () => {
+  paintBackground();
+  hasStrokes = false;
+  resultBox.style.display = "none";
+  statusEl.textContent = "Lienzo limpio. Dibuja un dígito.";
+});
+
+predictBtn.addEventListener("click", () => predict());
+
+function scheduleAutoPredict() {
+  clearTimeout(autoPredictTimer);
+  autoPredictTimer = setTimeout(() => predict(), 350);
+}
+
+function canvasToModelInput() {
+  const off = document.createElement("canvas");
+  off.width = IMG_SIZE;
+  off.height = IMG_SIZE;
+  const offCtx = off.getContext("2d");
+  offCtx.imageSmoothingEnabled = true;
+  offCtx.drawImage(canvas, 0, 0, IMG_SIZE, IMG_SIZE);
+
+  const imgData = offCtx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
+  const gray = new Float32Array(IMG_SIZE * IMG_SIZE);
+  for (let i = 0; i < IMG_SIZE * IMG_SIZE; i++) {
+    const r = imgData[i * 4];
+    const g = imgData[i * 4 + 1];
+    const b = imgData[i * 4 + 2];
+    gray[i] = ((r + g + b) / 3) / 255.0;
+  }
+  return tf.tensor(gray, [1, IMG_SIZE, IMG_SIZE]);
+}
+
+async function predict() {
+  if (!model) {
+    statusEl.textContent = "El modelo aún no carga.";
+    return;
+  }
+  if (!hasStrokes) {
+    statusEl.textContent = "Dibuja un dígito antes de predecir.";
+    return;
+  }
+
+  const input = canvasToModelInput();
+  const output = model.predict(input);
+  const probs = await output.data();
+  input.dispose();
+  output.dispose();
+
+  renderResult(probs);
+}
+
+function renderResult(probs) {
+  const arr = Array.from(probs);
+  const top = arr.indexOf(Math.max(...arr));
+
+  digitBig.textContent = top;
+  confidenceText.textContent = `Escribiste el número "${top}" · ${(arr[top] * 100).toFixed(1)}% de confianza`;
+
+  const ranked = arr
+    .map((p, i) => ({ digit: i, p }))
+    .sort((a, b) => b.p - a.p)
+    .slice(0, 5);
+
+  barsEl.innerHTML = "";
+  ranked.forEach(({ digit, p }) => {
+    const row = document.createElement("div");
+    row.className = "bar-row" + (digit === top ? " top" : "");
+    row.innerHTML = `
+      <span>${digit}</span>
+      <span class="bar-track"><span class="bar-fill" style="width:${(p * 100).toFixed(1)}%"></span></span>
+      <span>${(p * 100).toFixed(0)}%</span>
+    `;
+    barsEl.appendChild(row);
+  });
+
+  resultBox.style.display = "block";
+  statusEl.textContent = "";
+}
+
+async function init() {
+  resizeCanvasBacking();
+  try {
+    model = await tf.loadLayersModel(MODEL_URL);
+    statusEl.textContent = "Modelo listo. Dibuja un dígito.";
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "No se encontró el modelo en /model. Revisa el README.";
+  }
+}
+
+init();
+</script>
+</body>
+</html>
