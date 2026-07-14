@@ -4,6 +4,15 @@ import os
 import numpy as np
 from tensorflow.keras.models import load_model
 
+# --- DEBUG TEMPORAL: quitar estas líneas una vez resuelto el problema del modelo ---
+print("CWD:", os.getcwd())
+print("Archivos en la raíz:", os.listdir("."))
+if os.path.exists("model"):
+    print("Archivos en model/:", os.listdir("model"))
+else:
+    print("La carpeta 'model' no existe en este filesystem")
+# --- FIN DEBUG TEMPORAL ---
+
 app = Flask(__name__)
 
 IMG_SIZE = 16  # debe coincidir con el notebook
@@ -33,7 +42,6 @@ def predict():
             "error": f"Se esperaban {IMG_SIZE*IMG_SIZE} valores, llegaron {len(pixels)}"
         }), 400
 
-    # Reshape a (1, 16, 16) — NO (1, -1) — porque el modelo espera (None, 16, 16)
     x = np.array(pixels, dtype="float32").reshape(1, IMG_SIZE, IMG_SIZE)
 
     y_pred = MODEL.predict(x, verbose=0)
