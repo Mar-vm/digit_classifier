@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Reconocedor de dígitos · 16×16</title>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
 <style>
   :root{
     --paper:#f6f3ea;
@@ -221,7 +220,7 @@
   <header>
     <p class="eyebrow">Modelo · Dense NN · entrada 16×16</p>
     <h1>Escribe un <em>dígito</em></h1>
-    <p class="sub">Dibuja un número del 0 al 9 en el recuadro. El modelo reduce tu trazo a una imagen de 16×16 en escala de grises, igual que en el entrenamiento, y predice qué dígito escribiste.</p>
+    <p class="sub">Dibuja un número del 0 al 9 en el recuadro. La imagen se reduce a 16×16 en escala de grises, igual que en el entrenamiento, y el servidor la clasifica.</p>
   </header>
 
   <div class="stage">
@@ -234,7 +233,7 @@
     <button id="predictBtn" class="primary">Predecir</button>
   </div>
 
-  <p class="status" id="status">Cargando modelo…</p>
+  <p class="status" id="status">Dibuja un dígito.</p>
 
   <div class="result" id="resultBox" style="display:none;">
     <p class="result-label">Predicción</p>
@@ -246,13 +245,13 @@
   </div>
 
   <footer>
-    Modelo entrenado sobre MNIST, redimensionado a 16×16 y normalizado a [0, 1]. Inferencia 100% en el navegador con TensorFlow.js.
+    Modelo entrenado sobre MNIST, redimensionado a 16×16 y normalizado a [0, 1]. Inferencia en el servidor Flask.
   </footer>
 </div>
 
 <script>
 const IMG_SIZE = 16;
-const MODEL_URL = "model/model.json";
+const PREDICT_URL = "/predict";
 
 const canvas = document.getElementById("board");
 const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -264,10 +263,10 @@ const digitBig = document.getElementById("digitBig");
 const confidenceText = document.getElementById("confidenceText");
 const barsEl = document.getElementById("bars");
 
-let model = null;
 let drawing = false;
 let hasStrokes = false;
 let autoPredictTimer = null;
+let busy = false;
 
 function resizeCanvasBacking() {
   const rect = canvas.getBoundingClientRect();
@@ -337,7 +336,9 @@ function scheduleAutoPredict() {
   autoPredictTimer = setTimeout(() => predict(), 350);
 }
 
-function canvasToModelInput() {
+// Reduce el canvas a 16x16, promedia RGB -> gris, normaliza /255.
+// Debe coincidir EXACTO con el preprocesamiento del notebook (resize + /255).
+function canvasToPixelsArray() {
   const off = document.createElement("canvas");
   off.width = IMG_SIZE;
   off.height = IMG_SIZE;
@@ -346,43 +347,60 @@ function canvasToModelInput() {
   offCtx.drawImage(canvas, 0, 0, IMG_SIZE, IMG_SIZE);
 
   const imgData = offCtx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
-  const gray = new Float32Array(IMG_SIZE * IMG_SIZE);
+  const pixels = new Array(IMG_SIZE * IMG_SIZE);
   for (let i = 0; i < IMG_SIZE * IMG_SIZE; i++) {
     const r = imgData[i * 4];
     const g = imgData[i * 4 + 1];
     const b = imgData[i * 4 + 2];
-    gray[i] = ((r + g + b) / 3) / 255.0;
+    pixels[i] = ((r + g + b) / 3) / 255.0;
   }
-  return tf.tensor(gray, [1, IMG_SIZE, IMG_SIZE]);
+  return pixels; // arreglo plano de 256 valores, orden row-major (igual que reshape 16x16 en numpy)
 }
 
 async function predict() {
-  if (!model) {
-    statusEl.textContent = "El modelo aún no carga.";
-    return;
-  }
+  if (busy) return;
   if (!hasStrokes) {
     statusEl.textContent = "Dibuja un dígito antes de predecir.";
     return;
   }
 
-  const input = canvasToModelInput();
-  const output = model.predict(input);
-  const probs = await output.data();
-  input.dispose();
-  output.dispose();
+  busy = true;
+  predictBtn.disabled = true;
+  statusEl.textContent = "Prediciendo…";
 
-  renderResult(probs);
+  try {
+    const pixels = canvasToPixelsArray();
+
+    const res = await fetch(PREDICT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pixels })
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error || `Error ${res.status}`);
+    }
+
+    const data = await res.json();
+    renderResult(data);
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = `Error al predecir: ${err.message}`;
+  } finally {
+    busy = false;
+    predictBtn.disabled = false;
+  }
 }
 
-function renderResult(probs) {
-  const arr = Array.from(probs);
-  const top = arr.indexOf(Math.max(...arr));
+function renderResult(data) {
+  const probs = data.probs;
+  const top = data.class;
 
-  digitBig.textContent = top;
-  confidenceText.textContent = `Escribiste el número "${top}" · ${(arr[top] * 100).toFixed(1)}% de confianza`;
+  digitBig.textContent = data.label ?? top;
+  confidenceText.textContent = `Escribiste el número "${data.label ?? top}" · ${(probs[top] * 100).toFixed(1)}% de confianza`;
 
-  const ranked = arr
+  const ranked = probs
     .map((p, i) => ({ digit: i, p }))
     .sort((a, b) => b.p - a.p)
     .slice(0, 5);
@@ -403,18 +421,7 @@ function renderResult(probs) {
   statusEl.textContent = "";
 }
 
-async function init() {
-  resizeCanvasBacking();
-  try {
-    model = await tf.loadLayersModel(MODEL_URL);
-    statusEl.textContent = "Modelo listo. Dibuja un dígito.";
-  } catch (err) {
-    console.error(err);
-    statusEl.textContent = "No se encontró el modelo en /model. Revisa el README.";
-  }
-}
-
-init();
+resizeCanvasBacking();
 </script>
 </body>
 </html>

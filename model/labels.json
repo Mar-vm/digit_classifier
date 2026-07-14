@@ -1,0 +1,4 @@
+import json
+labels = {str(i): str(i) for i in range(10)}
+with open("model/labels.json", "w") as f:
+    json.dump(labels, f)
