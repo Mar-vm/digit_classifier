@@ -13,7 +13,7 @@ with open("model/labels.json", "r", encoding="utf-8") as f:
     LABELS = json.load(f)
 
 # Cargar modelo (ajusta el nombre/ruta si tu archivo es distinto)
-MODEL = load_model("model/model.h5")
+MODEL = load_model("digit_model_16x16.keras")
 
 @app.route("/")
 def index():
