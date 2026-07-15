@@ -118,6 +118,16 @@
         font-size: 0.85rem;
         color: #8a94a3;
     }
+
+    .status {
+        margin-top: 14px;
+        font-size: 0.78rem;
+        color: #565f6c;
+    }
+
+    .status.ready {
+        color: #6ee7a1;
+    }
 </style>
 </head>
 <body>
@@ -141,13 +151,22 @@
     <div class="result" id="result">
         <div class="label">Esperando un dígito...</div>
     </div>
+
+    <div class="status" id="apiStatus">Conectando con el servidor...</div>
 </div>
 
 <script>
+// -----------------------------------------------------------------------
+// IMPORTANTE: reemplaza esta URL por la de tu backend en Render.
+// Debe apuntar al backend (Flask + modelo), no a este archivo.
+// -----------------------------------------------------------------------
+const API_URL = "https://digit-classifier1.onrender.com";
+
 const canvas = document.getElementById("drawCanvas");
 const ctx = canvas.getContext("2d");
 const resultDiv = document.getElementById("result");
 const autoPredictCheckbox = document.getElementById("autoPredict");
+const apiStatusDiv = document.getElementById("apiStatus");
 
 const IMG_SIZE = 16;
 let drawing = false;
@@ -163,6 +182,23 @@ function resetCanvas() {
     hasDrawn = false;
 }
 resetCanvas();
+
+// "Calienta" el backend apenas se abre la página, así para cuando la persona
+// termine de dibujar el servidor ya está despierto y responde rápido.
+async function warmUpBackend() {
+    try {
+        const res = await fetch(`${API_URL}/`);
+        if (res.ok) {
+            apiStatusDiv.textContent = "Servidor listo ✓";
+            apiStatusDiv.classList.add("ready");
+        } else {
+            apiStatusDiv.textContent = "El servidor está despertando, puede tardar unos segundos...";
+        }
+    } catch (err) {
+        apiStatusDiv.textContent = "El servidor está despertando, puede tardar unos segundos...";
+    }
+}
+warmUpBackend();
 
 function getPos(evt) {
     const rect = canvas.getBoundingClientRect();
@@ -226,8 +262,6 @@ document.getElementById("predictBtn").addEventListener("click", () => {
 });
 
 function getPixelsFromCanvas() {
-    // Reducir el canvas de 280x280 a 16x16 usando un canvas oculto,
-    // igual que en el preprocesamiento del notebook.
     const smallCanvas = document.createElement("canvas");
     smallCanvas.width = IMG_SIZE;
     smallCanvas.height = IMG_SIZE;
@@ -239,7 +273,6 @@ function getPixelsFromCanvas() {
     const pixels = [];
 
     for (let i = 0; i < imageData.length; i += 4) {
-        // Trazo blanco sobre fondo negro -> el canal rojo ya representa la intensidad (0-255)
         pixels.push(imageData[i]);
     }
 
@@ -247,12 +280,12 @@ function getPixelsFromCanvas() {
 }
 
 async function predict() {
-    resultDiv.innerHTML = '<div class="label">Analizando...</div>';
+    resultDiv.innerHTML = '<div class="label">Analizando... (si el servidor estaba dormido, puede tardar hasta 1 min)</div>';
 
     const pixels = getPixelsFromCanvas();
 
     try {
-        const response = await fetch("/predict", {
+        const response = await fetch(`${API_URL}/predict`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ pixels })
@@ -265,13 +298,16 @@ async function predict() {
         const data = await response.json();
         const confidencePct = (data.confidence * 100).toFixed(1);
 
+        apiStatusDiv.textContent = "Servidor listo ✓";
+        apiStatusDiv.classList.add("ready");
+
         resultDiv.innerHTML = `
             <div class="digit">${data.digit}</div>
             <div class="label">Escribiste el número "${data.digit}"</div>
             <div class="confidence">Confianza: ${confidencePct}%</div>
         `;
     } catch (err) {
-        resultDiv.innerHTML = '<div class="label">Ocurrió un error al predecir. Intenta de nuevo.</div>';
+        resultDiv.innerHTML = '<div class="label">Ocurrió un error al predecir. Intenta de nuevo en unos segundos.</div>';
         console.error(err);
     }
 }

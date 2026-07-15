@@ -2,10 +2,15 @@ import json
 import os
 
 import numpy as np
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 from tensorflow import keras
 
 app = Flask(__name__)
+
+# Habilita CORS para que el frontend en GitHub Pages (otro dominio) pueda llamar a esta API.
+# Si quieres restringirlo solo a tu dominio de GitHub Pages en vez de "*", cambia origins.
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "digit_model.h5")
@@ -22,8 +27,9 @@ CLASS_NAMES = config["class_names"]
 
 
 @app.route("/")
-def index():
-    return render_template("index.html")
+def health():
+    # Endpoint simple para confirmar que la API está viva (útil para "calentarla" antes de la demo)
+    return jsonify({"status": "ok", "message": "Digit classifier API funcionando"})
 
 
 @app.route("/predict", methods=["POST"])
@@ -60,6 +66,5 @@ def predict():
 
 
 if __name__ == "__main__":
-    # Para correr localmente. En Render, gunicorn se encarga de levantar la app (ver Procfile).
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
