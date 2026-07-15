@@ -8,16 +8,15 @@ from tensorflow import keras
 
 app = Flask(__name__)
 
-# Habilita CORS para que el frontend en GitHub Pages (otro dominio) pueda llamar a esta API.
-# Si quieres restringirlo solo a tu dominio de GitHub Pages en vez de "*", cambia origins.
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "digit_model.h5")
 LABELS_PATH = os.path.join(BASE_DIR, "labels.json")
 
-# Cargar el modelo y la configuración (img_size, class_names) una sola vez al iniciar
-model = keras.models.load_model(MODEL_PATH)
+print("Cargando modelo...")
+# compile=False evita reconstruir el optimizador/estado de entrenamiento -> menos memoria y más rápido
+model = keras.models.load_model(MODEL_PATH, compile=False)
 
 with open(LABELS_PATH, "r") as f:
     config = json.load(f)
@@ -25,18 +24,15 @@ with open(LABELS_PATH, "r") as f:
 IMG_SIZE = config["img_size"]
 CLASS_NAMES = config["class_names"]
 
-# "Calentar" el modelo con una predicción falsa apenas arranca el servidor.
-# La primera vez que se llama a model.predict(), TensorFlow traza el grafo de cálculo
-# internamente y eso puede tardar mucho (30-90s en un CPU limitado como el del plan free
-# de Render). Si esto pasa aquí, en el arranque, el usuario nunca lo sufre.
+# Precalentar el modelo con una predicción falsa al arrancar, para que la primera
+# predicción real de un usuario no cargue con el costo de la primera traza de TensorFlow.
 _dummy_input = np.zeros((1, IMG_SIZE, IMG_SIZE), dtype="float32")
 model.predict(_dummy_input, verbose=0)
-print("Modelo precalentado y listo para predecir")
+print("Modelo cargado y precalentado.")
 
 
 @app.route("/")
 def health():
-    # Endpoint simple para confirmar que la API está viva (útil para "calentarla" antes de la demo)
     return jsonify({"status": "ok", "message": "Digit classifier API funcionando"})
 
 
@@ -55,7 +51,6 @@ def predict():
             "error": f"Se esperaban {expected_len} pixeles ({IMG_SIZE}x{IMG_SIZE}), llegaron {len(pixels)}"
         }), 400
 
-    # pixels llega en escala 0-255 desde el canvas -> normalizar igual que en entrenamiento
     image = np.array(pixels, dtype="float32").reshape(1, IMG_SIZE, IMG_SIZE) / 255.0
 
     predictions = model.predict(image, verbose=0)[0]
