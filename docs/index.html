@@ -4,9 +4,30 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reconocimiento de Dígitos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
+    :root {
+        --bg: #09090d;
+        --bg-grid: #120c17;
+        --card: #120a16;
+        --card-border: #2a1230;
+        --fuchsia: #ff2ec4;
+        --fuchsia-dim: #7a1a5e;
+        --violet: #8b1fd4;
+        --ink: #f6eef8;
+        --muted: #a98fb0;
+        --muted-dim: #5e4a66;
+        --ok: #39ffb0;
+    }
+
     * {
         box-sizing: border-box;
+    }
+
+    html, body {
+        height: 100%;
     }
 
     body {
@@ -15,98 +36,203 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #101418;
-        font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-        color: #eef1f5;
-        padding: 20px;
+        background:
+            radial-gradient(circle at 15% 10%, rgba(255, 46, 196, 0.10), transparent 40%),
+            radial-gradient(circle at 85% 90%, rgba(139, 31, 212, 0.12), transparent 45%),
+            var(--bg);
+        background-image:
+            linear-gradient(rgba(255, 46, 196, 0.05) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 46, 196, 0.05) 1px, transparent 1px),
+            radial-gradient(circle at 15% 10%, rgba(255, 46, 196, 0.10), transparent 40%),
+            radial-gradient(circle at 85% 90%, rgba(139, 31, 212, 0.12), transparent 45%),
+            var(--bg);
+        background-size: 28px 28px, 28px 28px, auto, auto, auto;
+        font-family: 'Space Grotesk', sans-serif;
+        color: var(--ink);
+        padding: 24px;
     }
 
     .card {
-        background: #181d24;
-        border-radius: 18px;
-        padding: 28px 32px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        position: relative;
+        background: linear-gradient(180deg, var(--card), #0d0710);
+        border: 1px solid var(--card-border);
+        border-radius: 20px;
+        padding: 30px 30px 26px;
         width: 100%;
-        max-width: 420px;
+        max-width: 400px;
         text-align: center;
+        box-shadow:
+            0 0 0 1px rgba(255, 46, 196, 0.06),
+            0 20px 60px rgba(0, 0, 0, 0.6),
+            0 0 80px rgba(139, 31, 212, 0.08);
+    }
+
+    .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.68rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--fuchsia);
+        margin-bottom: 10px;
+    }
+
+    .eyebrow .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--fuchsia);
+        box-shadow: 0 0 8px 1px var(--fuchsia);
+        animation: pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.35; }
     }
 
     h1 {
-        font-size: 1.3rem;
+        font-size: 1.5rem;
+        font-weight: 700;
         margin: 0 0 4px 0;
-        letter-spacing: 0.3px;
+        letter-spacing: -0.01em;
     }
 
     p.subtitle {
-        margin: 0 0 20px 0;
-        color: #8a94a3;
-        font-size: 0.9rem;
+        margin: 0 0 22px 0;
+        color: var(--muted);
+        font-size: 0.85rem;
+    }
+
+    /* ---------- Visor de escaneo ---------- */
+
+    .scanner {
+        position: relative;
+        width: 100%;
+        max-width: 300px;
+        aspect-ratio: 1 / 1;
+        margin: 0 auto;
+        padding: 14px;
+    }
+
+    .scanner::before,
+    .scanner::after,
+    .corner-br,
+    .corner-bl {
+        content: "";
+        position: absolute;
+        width: 26px;
+        height: 26px;
+        border: 2px solid var(--fuchsia);
+        filter: drop-shadow(0 0 4px rgba(255, 46, 196, 0.7));
+    }
+
+    .scanner::before {
+        top: 0; left: 0;
+        border-right: none;
+        border-bottom: none;
+        border-radius: 6px 0 0 0;
+    }
+
+    .scanner::after {
+        top: 0; right: 0;
+        border-left: none;
+        border-bottom: none;
+        border-radius: 0 6px 0 0;
+    }
+
+    .corner-bl {
+        bottom: 0; left: 0;
+        border-right: none;
+        border-top: none;
+        border-radius: 0 0 0 6px;
+    }
+
+    .corner-br {
+        bottom: 0; right: 0;
+        border-left: none;
+        border-top: none;
+        border-radius: 0 0 6px 0;
     }
 
     #drawCanvas {
+        display: block;
+        width: 100%;
+        height: 100%;
         background: #000;
-        border-radius: 12px;
-        border: 2px solid #2a3038;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 46, 196, 0.25);
         touch-action: none;
         cursor: crosshair;
-        width: 100%;
-        max-width: 320px;
-        aspect-ratio: 1 / 1;
     }
+
+    .scan-line {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--fuchsia), transparent);
+        box-shadow: 0 0 12px 2px var(--fuchsia);
+        top: 14px;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .scan-line.active {
+        animation: scan 1.1s linear infinite;
+        opacity: 1;
+    }
+
+    @keyframes scan {
+        0%   { top: 14px; }
+        100% { top: calc(100% - 16px); }
+    }
+
+    /* ---------- Controles ---------- */
 
     .buttons {
         display: flex;
         gap: 10px;
-        margin-top: 18px;
+        margin-top: 20px;
     }
 
     button {
         flex: 1;
         padding: 12px 0;
-        border: none;
         border-radius: 10px;
-        font-size: 0.95rem;
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 0.92rem;
         font-weight: 600;
         cursor: pointer;
-        transition: transform 0.1s ease, opacity 0.2s ease;
+        transition: transform 0.12s ease, filter 0.15s ease;
+        border: 1px solid transparent;
     }
 
     button:active {
-        transform: scale(0.97);
+        transform: scale(0.96);
     }
 
     #predictBtn {
-        background: #4f8cff;
-        color: white;
+        background: linear-gradient(135deg, var(--fuchsia), var(--violet));
+        color: #140018;
+        box-shadow: 0 4px 20px rgba(255, 46, 196, 0.35);
+    }
+
+    #predictBtn:hover {
+        filter: brightness(1.08);
     }
 
     #clearBtn {
-        background: #2a3038;
-        color: #eef1f5;
+        background: transparent;
+        color: var(--muted);
+        border-color: var(--card-border);
     }
 
-    .result {
-        margin-top: 22px;
-        min-height: 90px;
-    }
-
-    .result .digit {
-        font-size: 3.2rem;
-        font-weight: 700;
-        line-height: 1;
-        color: #4f8cff;
-    }
-
-    .result .label {
-        color: #8a94a3;
-        font-size: 0.9rem;
-        margin-top: 6px;
-    }
-
-    .result .confidence {
-        margin-top: 4px;
-        font-size: 0.85rem;
-        color: #6ee7a1;
+    #clearBtn:hover {
+        color: var(--ink);
+        border-color: var(--fuchsia-dim);
     }
 
     .toggle {
@@ -115,28 +241,99 @@
         align-items: center;
         justify-content: center;
         gap: 8px;
-        font-size: 0.85rem;
-        color: #8a94a3;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.72rem;
+        color: var(--muted);
+    }
+
+    .toggle input {
+        accent-color: var(--fuchsia);
+    }
+
+    /* ---------- Resultado ---------- */
+
+    .result {
+        margin-top: 22px;
+        min-height: 96px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .result .status-text {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.78rem;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+    }
+
+    .result .status-text .cursor {
+        display: inline-block;
+        width: 6px;
+        height: 12px;
+        background: var(--fuchsia);
+        margin-left: 4px;
+        animation: blink 1s step-start infinite;
+        vertical-align: middle;
+    }
+
+    @keyframes blink {
+        50% { opacity: 0; }
+    }
+
+    .result .digit {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 3.6rem;
+        font-weight: 700;
+        line-height: 1;
+        color: var(--fuchsia);
+        text-shadow: 0 0 22px rgba(255, 46, 196, 0.55), 0 0 60px rgba(139, 31, 212, 0.35);
+        animation: reveal 0.35s ease;
+    }
+
+    @keyframes reveal {
+        from { opacity: 0; transform: scale(0.85); }
+        to { opacity: 1; transform: scale(1); }
+    }
+
+    .result .label {
+        color: var(--muted);
+        font-size: 0.88rem;
+        margin-top: 4px;
+    }
+
+    .result .confidence {
+        margin-top: 6px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.76rem;
+        color: var(--ok);
     }
 
     .status {
-        margin-top: 14px;
-        font-size: 0.78rem;
-        color: #565f6c;
+        margin-top: 16px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.68rem;
+        letter-spacing: 0.04em;
+        color: var(--muted-dim);
     }
 
     .status.ready {
-        color: #6ee7a1;
+        color: var(--ok);
     }
 </style>
 </head>
 <body>
 
 <div class="card">
+    <div class="eyebrow"><span class="dot"></span>Modelo neuronal · 16&times;16</div>
     <h1>Reconocimiento de Dígitos</h1>
-    <p class="subtitle">Dibuja un número del 0 al 9 en el recuadro</p>
+    <p class="subtitle">Dibuja un número del 0 al 9 en el visor</p>
 
-    <canvas id="drawCanvas" width="280" height="280"></canvas>
+    <div class="scanner">
+        <div class="scan-line" id="scanLine"></div>
+        <canvas id="drawCanvas" width="280" height="280"></canvas>
+    </div>
 
     <div class="buttons">
         <button id="predictBtn">Predecir</button>
@@ -145,21 +342,17 @@
 
     <label class="toggle">
         <input type="checkbox" id="autoPredict" checked>
-        Predecir automáticamente al soltar el lápiz
+        Auto-predecir al soltar el lápiz
     </label>
 
     <div class="result" id="result">
-        <div class="label">Esperando un dígito...</div>
+        <div class="status-text">Esperando un dígito<span class="cursor"></span></div>
     </div>
 
-    <div class="status" id="apiStatus">Conectando con el servidor...</div>
+    <div class="status" id="apiStatus">CONECTANDO CON EL SERVIDOR...</div>
 </div>
 
 <script>
-// -----------------------------------------------------------------------
-// IMPORTANTE: reemplaza esta URL por la de tu backend en Render.
-// Debe apuntar al backend (Flask + modelo), no a este archivo.
-// -----------------------------------------------------------------------
 const API_URL = "https://digit-classifier2.onrender.com";
 
 const canvas = document.getElementById("drawCanvas");
@@ -167,6 +360,7 @@ const ctx = canvas.getContext("2d");
 const resultDiv = document.getElementById("result");
 const autoPredictCheckbox = document.getElementById("autoPredict");
 const apiStatusDiv = document.getElementById("apiStatus");
+const scanLine = document.getElementById("scanLine");
 
 const IMG_SIZE = 16;
 let drawing = false;
@@ -183,19 +377,17 @@ function resetCanvas() {
 }
 resetCanvas();
 
-// "Calienta" el backend apenas se abre la página, así para cuando la persona
-// termine de dibujar el servidor ya está despierto y responde rápido.
 async function warmUpBackend() {
     try {
         const res = await fetch(`${API_URL}/`);
         if (res.ok) {
-            apiStatusDiv.textContent = "Servidor listo ✓";
+            apiStatusDiv.textContent = "SERVIDOR LISTO ✓";
             apiStatusDiv.classList.add("ready");
         } else {
-            apiStatusDiv.textContent = "El servidor está despertando, puede tardar unos segundos...";
+            apiStatusDiv.textContent = "DESPERTANDO SERVIDOR...";
         }
     } catch (err) {
-        apiStatusDiv.textContent = "El servidor está despertando, puede tardar unos segundos...";
+        apiStatusDiv.textContent = "DESPERTANDO SERVIDOR...";
     }
 }
 warmUpBackend();
@@ -253,7 +445,7 @@ canvas.addEventListener("touchend", endDraw);
 
 document.getElementById("clearBtn").addEventListener("click", () => {
     resetCanvas();
-    resultDiv.innerHTML = '<div class="label">Esperando un dígito...</div>';
+    resultDiv.innerHTML = '<div class="status-text">Esperando un dígito<span class="cursor"></span></div>';
 });
 
 document.getElementById("predictBtn").addEventListener("click", () => {
@@ -280,7 +472,8 @@ function getPixelsFromCanvas() {
 }
 
 async function predict() {
-    resultDiv.innerHTML = '<div class="label">Analizando... (si el servidor estaba dormido, puede tardar hasta 1 min)</div>';
+    resultDiv.innerHTML = '<div class="status-text">Analizando trazo<span class="cursor"></span></div>';
+    scanLine.classList.add("active");
 
     const pixels = getPixelsFromCanvas();
 
@@ -298,17 +491,19 @@ async function predict() {
         const data = await response.json();
         const confidencePct = (data.confidence * 100).toFixed(1);
 
-        apiStatusDiv.textContent = "Servidor listo ✓";
+        apiStatusDiv.textContent = "SERVIDOR LISTO ✓";
         apiStatusDiv.classList.add("ready");
 
         resultDiv.innerHTML = `
             <div class="digit">${data.digit}</div>
             <div class="label">Escribiste el número "${data.digit}"</div>
-            <div class="confidence">Confianza: ${confidencePct}%</div>
+            <div class="confidence">CONFIANZA ${confidencePct}%</div>
         `;
     } catch (err) {
-        resultDiv.innerHTML = '<div class="label">Ocurrió un error al predecir. Intenta de nuevo en unos segundos.</div>';
+        resultDiv.innerHTML = '<div class="status-text" style="color:#ff5c7a">Error al predecir, intenta de nuevo</div>';
         console.error(err);
+    } finally {
+        scanLine.classList.remove("active");
     }
 }
 </script>
