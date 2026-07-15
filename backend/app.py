@@ -2,21 +2,24 @@ import json
 import os
 
 import numpy as np
+from ai_edge_litert.interpreter import Interpreter
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from tensorflow import keras
 
 app = Flask(__name__)
 
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "digit_model.h5")
+MODEL_PATH = os.path.join(BASE_DIR, "digit_model.tflite")
 LABELS_PATH = os.path.join(BASE_DIR, "labels.json")
 
-print("Cargando modelo...")
-# compile=False evita reconstruir el optimizador/estado de entrenamiento -> menos memoria y más rápido
-model = keras.models.load_model(MODEL_PATH, compile=False)
+print("Cargando modelo TFLite...")
+interpreter = Interpreter(model_path=MODEL_PATH)
+interpreter.allocate_tensors()
+
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
 with open(LABELS_PATH, "r") as f:
     config = json.load(f)
@@ -24,16 +27,16 @@ with open(LABELS_PATH, "r") as f:
 IMG_SIZE = config["img_size"]
 CLASS_NAMES = config["class_names"]
 
-# Precalentar el modelo con una predicción falsa al arrancar, para que la primera
-# predicción real de un usuario no cargue con el costo de la primera traza de TensorFlow.
+# Precalentar el interprete con una prediccion falsa al arrancar
 _dummy_input = np.zeros((1, IMG_SIZE, IMG_SIZE), dtype="float32")
-model.predict(_dummy_input, verbose=0)
-print("Modelo cargado y precalentado.")
+interpreter.set_tensor(input_details[0]["index"], _dummy_input)
+interpreter.invoke()
+print("Modelo TFLite cargado y precalentado.")
 
 
 @app.route("/")
 def health():
-    return jsonify({"status": "ok", "message": "Digit classifier API funcionando"})
+    return jsonify({"status": "ok", "message": "Digit classifier API funcionando (TensorFlow Lite)"})
 
 
 @app.route("/predict", methods=["POST"])
@@ -53,7 +56,10 @@ def predict():
 
     image = np.array(pixels, dtype="float32").reshape(1, IMG_SIZE, IMG_SIZE) / 255.0
 
-    predictions = model.predict(image, verbose=0)[0]
+    interpreter.set_tensor(input_details[0]["index"], image)
+    interpreter.invoke()
+    predictions = interpreter.get_tensor(output_details[0]["index"])[0]
+
     predicted_index = int(np.argmax(predictions))
 
     probabilities = {
