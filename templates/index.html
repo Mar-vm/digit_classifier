@@ -2,426 +2,280 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Reconocedor de dígitos · 16×16</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reconocimiento de Dígitos</title>
 <style>
-  :root{
-    --paper:#f6f3ea;
-    --ink:#1f2a24;
-    --graphite:#4a5a52;
-    --chalk-green:#2f5d4e;
-    --accent:#c1502e;
-    --line:#d9d2bd;
-    --canvas-bg:#10160f;
-  }
+    * {
+        box-sizing: border-box;
+    }
 
-  *{ box-sizing:border-box; }
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #101418;
+        font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+        color: #eef1f5;
+        padding: 20px;
+    }
 
-  html,body{
-    margin:0;
-    padding:0;
-    background:var(--paper);
-    color:var(--ink);
-    font-family:'Courier New', ui-monospace, monospace;
-    min-height:100vh;
-  }
+    .card {
+        background: #181d24;
+        border-radius: 18px;
+        padding: 28px 32px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        width: 100%;
+        max-width: 420px;
+        text-align: center;
+    }
 
-  body{
-    display:flex;
-    justify-content:center;
-    padding:28px 16px 60px;
-  }
+    h1 {
+        font-size: 1.3rem;
+        margin: 0 0 4px 0;
+        letter-spacing: 0.3px;
+    }
 
-  .sheet{
-    width:100%;
-    max-width:460px;
-  }
+    p.subtitle {
+        margin: 0 0 20px 0;
+        color: #8a94a3;
+        font-size: 0.9rem;
+    }
 
-  header{
-    border-bottom:2px solid var(--ink);
-    padding-bottom:14px;
-    margin-bottom:22px;
-  }
+    #drawCanvas {
+        background: #000;
+        border-radius: 12px;
+        border: 2px solid #2a3038;
+        touch-action: none;
+        cursor: crosshair;
+        width: 100%;
+        max-width: 320px;
+        aspect-ratio: 1 / 1;
+    }
 
-  .eyebrow{
-    font-size:11px;
-    letter-spacing:.18em;
-    text-transform:uppercase;
-    color:var(--graphite);
-    margin:0 0 6px;
-  }
+    .buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 18px;
+    }
 
-  h1{
-    font-family:Georgia, 'Times New Roman', serif;
-    font-size:28px;
-    margin:0;
-    line-height:1.15;
-    letter-spacing:-.01em;
-  }
+    button {
+        flex: 1;
+        padding: 12px 0;
+        border: none;
+        border-radius: 10px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.1s ease, opacity 0.2s ease;
+    }
 
-  h1 em{
-    font-style:normal;
-    color:var(--accent);
-  }
+    button:active {
+        transform: scale(0.97);
+    }
 
-  .sub{
-    margin:10px 0 0;
-    font-size:13px;
-    color:var(--graphite);
-    line-height:1.5;
-  }
+    #predictBtn {
+        background: #4f8cff;
+        color: white;
+    }
 
-  .stage{
-    position:relative;
-    margin:24px 0 10px;
-  }
+    #clearBtn {
+        background: #2a3038;
+        color: #eef1f5;
+    }
 
-  #board{
-    width:100%;
-    aspect-ratio:1/1;
-    background:var(--canvas-bg);
-    border:2px solid var(--ink);
-    border-radius:2px;
-    touch-action:none;
-    display:block;
-    cursor:crosshair;
-  }
+    .result {
+        margin-top: 22px;
+        min-height: 90px;
+    }
 
-  .grid-note{
-    position:absolute;
-    top:8px;
-    left:10px;
-    font-size:10px;
-    letter-spacing:.1em;
-    color:#8fa89b;
-    text-transform:uppercase;
-    pointer-events:none;
-  }
+    .result .digit {
+        font-size: 3.2rem;
+        font-weight: 700;
+        line-height: 1;
+        color: #4f8cff;
+    }
 
-  .controls{
-    display:flex;
-    gap:10px;
-    margin-top:14px;
-  }
+    .result .label {
+        color: #8a94a3;
+        font-size: 0.9rem;
+        margin-top: 6px;
+    }
 
-  button{
-    font-family:inherit;
-    font-size:13px;
-    letter-spacing:.04em;
-    text-transform:uppercase;
-    padding:12px 16px;
-    border-radius:2px;
-    cursor:pointer;
-    border:2px solid var(--ink);
-    background:transparent;
-    color:var(--ink);
-    flex:1;
-    transition:transform .08s ease, background .15s ease, color .15s ease;
-  }
+    .result .confidence {
+        margin-top: 4px;
+        font-size: 0.85rem;
+        color: #6ee7a1;
+    }
 
-  button:active{ transform:translateY(1px); }
-
-  button.primary{
-    background:var(--ink);
-    color:var(--paper);
-  }
-
-  button:disabled{
-    opacity:.4;
-    cursor:not-allowed;
-  }
-
-  .result{
-    margin-top:24px;
-    border:2px solid var(--ink);
-    border-radius:2px;
-    padding:20px;
-    background:#fff;
-  }
-
-  .result-label{
-    font-size:11px;
-    letter-spacing:.16em;
-    text-transform:uppercase;
-    color:var(--graphite);
-    margin:0 0 8px;
-  }
-
-  .result-main{
-    display:flex;
-    align-items:baseline;
-    gap:16px;
-  }
-
-  .digit-big{
-    font-family:Georgia, serif;
-    font-size:64px;
-    line-height:1;
-    color:var(--accent);
-    min-width:64px;
-  }
-
-  .confidence{
-    font-size:13px;
-    color:var(--graphite);
-  }
-
-  .bars{
-    margin-top:18px;
-    display:flex;
-    flex-direction:column;
-    gap:5px;
-  }
-
-  .bar-row{
-    display:grid;
-    grid-template-columns:16px 1fr 40px;
-    align-items:center;
-    gap:8px;
-    font-size:11px;
-    color:var(--graphite);
-  }
-
-  .bar-track{
-    height:8px;
-    background:var(--line);
-    border-radius:1px;
-    overflow:hidden;
-  }
-
-  .bar-fill{
-    height:100%;
-    background:var(--chalk-green);
-    width:0%;
-    transition:width .25s ease;
-  }
-
-  .bar-row.top .bar-fill{ background:var(--accent); }
-  .bar-row.top{ color:var(--ink); font-weight:bold; }
-
-  .status{
-    margin-top:14px;
-    font-size:12px;
-    color:var(--graphite);
-    min-height:16px;
-  }
-
-  footer{
-    margin-top:30px;
-    font-size:11px;
-    color:var(--graphite);
-    border-top:1px solid var(--line);
-    padding-top:14px;
-  }
+    .toggle {
+        margin-top: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        color: #8a94a3;
+    }
 </style>
 </head>
 <body>
-<div class="sheet">
-  <header>
-    <p class="eyebrow">Modelo · Dense NN · entrada 16×16</p>
-    <h1>Escribe un <em>dígito</em></h1>
-    <p class="sub">Dibuja un número del 0 al 9 en el recuadro. La imagen se reduce a 16×16 en escala de grises, igual que en el entrenamiento, y el servidor la clasifica.</p>
-  </header>
 
-  <div class="stage">
-    <span class="grid-note">Lienzo</span>
-    <canvas id="board"></canvas>
-  </div>
+<div class="card">
+    <h1>Reconocimiento de Dígitos</h1>
+    <p class="subtitle">Dibuja un número del 0 al 9 en el recuadro</p>
 
-  <div class="controls">
-    <button id="clearBtn">Limpiar</button>
-    <button id="predictBtn" class="primary">Predecir</button>
-  </div>
+    <canvas id="drawCanvas" width="280" height="280"></canvas>
 
-  <p class="status" id="status">Dibuja un dígito.</p>
-
-  <div class="result" id="resultBox" style="display:none;">
-    <p class="result-label">Predicción</p>
-    <div class="result-main">
-      <div class="digit-big" id="digitBig">—</div>
-      <div class="confidence" id="confidenceText"></div>
+    <div class="buttons">
+        <button id="predictBtn">Predecir</button>
+        <button id="clearBtn">Borrar</button>
     </div>
-    <div class="bars" id="bars"></div>
-  </div>
 
-  <footer>
-    Modelo entrenado sobre MNIST, redimensionado a 16×16 y normalizado a [0, 1]. Inferencia en el servidor Flask.
-  </footer>
+    <label class="toggle">
+        <input type="checkbox" id="autoPredict" checked>
+        Predecir automáticamente al soltar el lápiz
+    </label>
+
+    <div class="result" id="result">
+        <div class="label">Esperando un dígito...</div>
+    </div>
 </div>
 
 <script>
+const canvas = document.getElementById("drawCanvas");
+const ctx = canvas.getContext("2d");
+const resultDiv = document.getElementById("result");
+const autoPredictCheckbox = document.getElementById("autoPredict");
+
 const IMG_SIZE = 16;
-const PREDICT_URL = "/predict";
-
-const canvas = document.getElementById("board");
-const ctx = canvas.getContext("2d", { willReadFrequently: true });
-const statusEl = document.getElementById("status");
-const predictBtn = document.getElementById("predictBtn");
-const clearBtn = document.getElementById("clearBtn");
-const resultBox = document.getElementById("resultBox");
-const digitBig = document.getElementById("digitBig");
-const confidenceText = document.getElementById("confidenceText");
-const barsEl = document.getElementById("bars");
-
 let drawing = false;
-let hasStrokes = false;
-let autoPredictTimer = null;
-let busy = false;
+let hasDrawn = false;
 
-function resizeCanvasBacking() {
-  const rect = canvas.getBoundingClientRect();
-  const ratio = window.devicePixelRatio || 1;
-  canvas.width = rect.width * ratio;
-  canvas.height = rect.height * ratio;
-  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  paintBackground();
+function resetCanvas() {
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 18;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    hasDrawn = false;
 }
+resetCanvas();
 
-function paintBackground() {
-  const rect = canvas.getBoundingClientRect();
-  ctx.fillStyle = "#10160f";
-  ctx.fillRect(0, 0, rect.width, rect.height);
-  ctx.lineWidth = Math.max(rect.width * 0.09, 14);
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = "#f2efe6";
-}
+function getPos(evt) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
-window.addEventListener("resize", resizeCanvasBacking);
-
-function pointerPos(evt) {
-  const rect = canvas.getBoundingClientRect();
-  const p = evt.touches ? evt.touches[0] : evt;
-  return { x: p.clientX - rect.left, y: p.clientY - rect.top };
+    if (evt.touches && evt.touches.length > 0) {
+        return {
+            x: (evt.touches[0].clientX - rect.left) * scaleX,
+            y: (evt.touches[0].clientY - rect.top) * scaleY
+        };
+    }
+    return {
+        x: (evt.clientX - rect.left) * scaleX,
+        y: (evt.clientY - rect.top) * scaleY
+    };
 }
 
 function startDraw(evt) {
-  evt.preventDefault();
-  drawing = true;
-  hasStrokes = true;
-  const { x, y } = pointerPos(evt);
-  ctx.beginPath();
-  ctx.moveTo(x, y);
+    evt.preventDefault();
+    drawing = true;
+    hasDrawn = true;
+    const pos = getPos(evt);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
 }
 
-function moveDraw(evt) {
-  if (!drawing) return;
-  evt.preventDefault();
-  const { x, y } = pointerPos(evt);
-  ctx.lineTo(x, y);
-  ctx.stroke();
+function draw(evt) {
+    if (!drawing) return;
+    evt.preventDefault();
+    const pos = getPos(evt);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
 }
 
 function endDraw(evt) {
-  if (!drawing) return;
-  drawing = false;
-  scheduleAutoPredict();
+    if (!drawing) return;
+    drawing = false;
+    if (autoPredictCheckbox.checked && hasDrawn) {
+        predict();
+    }
 }
 
-["mousedown", "touchstart"].forEach(e => canvas.addEventListener(e, startDraw, { passive: false }));
-["mousemove", "touchmove"].forEach(e => canvas.addEventListener(e, moveDraw, { passive: false }));
-["mouseup", "mouseleave", "touchend", "touchcancel"].forEach(e => canvas.addEventListener(e, endDraw));
+canvas.addEventListener("mousedown", startDraw);
+canvas.addEventListener("mousemove", draw);
+canvas.addEventListener("mouseup", endDraw);
+canvas.addEventListener("mouseleave", endDraw);
 
-clearBtn.addEventListener("click", () => {
-  paintBackground();
-  hasStrokes = false;
-  resultBox.style.display = "none";
-  statusEl.textContent = "Lienzo limpio. Dibuja un dígito.";
+canvas.addEventListener("touchstart", startDraw);
+canvas.addEventListener("touchmove", draw);
+canvas.addEventListener("touchend", endDraw);
+
+document.getElementById("clearBtn").addEventListener("click", () => {
+    resetCanvas();
+    resultDiv.innerHTML = '<div class="label">Esperando un dígito...</div>';
 });
 
-predictBtn.addEventListener("click", () => predict());
+document.getElementById("predictBtn").addEventListener("click", () => {
+    if (!hasDrawn) return;
+    predict();
+});
 
-function scheduleAutoPredict() {
-  clearTimeout(autoPredictTimer);
-  autoPredictTimer = setTimeout(() => predict(), 350);
-}
+function getPixelsFromCanvas() {
+    // Reducir el canvas de 280x280 a 16x16 usando un canvas oculto,
+    // igual que en el preprocesamiento del notebook.
+    const smallCanvas = document.createElement("canvas");
+    smallCanvas.width = IMG_SIZE;
+    smallCanvas.height = IMG_SIZE;
+    const smallCtx = smallCanvas.getContext("2d");
+    smallCtx.imageSmoothingEnabled = true;
+    smallCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, IMG_SIZE, IMG_SIZE);
 
-// Reduce el canvas a 16x16, promedia RGB -> gris, normaliza /255.
-// Debe coincidir EXACTO con el preprocesamiento del notebook (resize + /255).
-function canvasToPixelsArray() {
-  const off = document.createElement("canvas");
-  off.width = IMG_SIZE;
-  off.height = IMG_SIZE;
-  const offCtx = off.getContext("2d");
-  offCtx.imageSmoothingEnabled = true;
-  offCtx.drawImage(canvas, 0, 0, IMG_SIZE, IMG_SIZE);
+    const imageData = smallCtx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
+    const pixels = [];
 
-  const imgData = offCtx.getImageData(0, 0, IMG_SIZE, IMG_SIZE).data;
-  const pixels = new Array(IMG_SIZE * IMG_SIZE);
-  for (let i = 0; i < IMG_SIZE * IMG_SIZE; i++) {
-    const r = imgData[i * 4];
-    const g = imgData[i * 4 + 1];
-    const b = imgData[i * 4 + 2];
-    pixels[i] = ((r + g + b) / 3) / 255.0;
-  }
-  return pixels; // arreglo plano de 256 valores, orden row-major (igual que reshape 16x16 en numpy)
+    for (let i = 0; i < imageData.length; i += 4) {
+        // Trazo blanco sobre fondo negro -> el canal rojo ya representa la intensidad (0-255)
+        pixels.push(imageData[i]);
+    }
+
+    return pixels;
 }
 
 async function predict() {
-  if (busy) return;
-  if (!hasStrokes) {
-    statusEl.textContent = "Dibuja un dígito antes de predecir.";
-    return;
-  }
+    resultDiv.innerHTML = '<div class="label">Analizando...</div>';
 
-  busy = true;
-  predictBtn.disabled = true;
-  statusEl.textContent = "Prediciendo…";
+    const pixels = getPixelsFromCanvas();
 
-  try {
-    const pixels = canvasToPixelsArray();
+    try {
+        const response = await fetch("/predict", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pixels })
+        });
 
-    const res = await fetch(PREDICT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pixels })
-    });
+        if (!response.ok) {
+            throw new Error("Error en la predicción");
+        }
 
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      throw new Error(errBody.error || `Error ${res.status}`);
+        const data = await response.json();
+        const confidencePct = (data.confidence * 100).toFixed(1);
+
+        resultDiv.innerHTML = `
+            <div class="digit">${data.digit}</div>
+            <div class="label">Escribiste el número "${data.digit}"</div>
+            <div class="confidence">Confianza: ${confidencePct}%</div>
+        `;
+    } catch (err) {
+        resultDiv.innerHTML = '<div class="label">Ocurrió un error al predecir. Intenta de nuevo.</div>';
+        console.error(err);
     }
-
-    const data = await res.json();
-    renderResult(data);
-  } catch (err) {
-    console.error(err);
-    statusEl.textContent = `Error al predecir: ${err.message}`;
-  } finally {
-    busy = false;
-    predictBtn.disabled = false;
-  }
 }
-
-function renderResult(data) {
-  const probs = data.probs;
-  const top = data.class;
-
-  digitBig.textContent = data.label ?? top;
-  confidenceText.textContent = `Escribiste el número "${data.label ?? top}" · ${(probs[top] * 100).toFixed(1)}% de confianza`;
-
-  const ranked = probs
-    .map((p, i) => ({ digit: i, p }))
-    .sort((a, b) => b.p - a.p)
-    .slice(0, 5);
-
-  barsEl.innerHTML = "";
-  ranked.forEach(({ digit, p }) => {
-    const row = document.createElement("div");
-    row.className = "bar-row" + (digit === top ? " top" : "");
-    row.innerHTML = `
-      <span>${digit}</span>
-      <span class="bar-track"><span class="bar-fill" style="width:${(p * 100).toFixed(1)}%"></span></span>
-      <span>${(p * 100).toFixed(0)}%</span>
-    `;
-    barsEl.appendChild(row);
-  });
-
-  resultBox.style.display = "block";
-  statusEl.textContent = "";
-}
-
-resizeCanvasBacking();
 </script>
+
 </body>
 </html>

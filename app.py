@@ -1,28 +1,24 @@
-from flask import Flask, render_template, request, jsonify
 import json
 import os
+
 import numpy as np
-from tensorflow.keras.models import load_model
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-IMG_SIZE = 16  # debe coincidir con el notebook
-
-MODEL_PATH = os.path.join(BASE_DIR, "digit_model_16x16.keras")
-LABELS_PATH = os.path.join(BASE_DIR, "model", "labels.json")
+from flask import Flask, jsonify, render_template, request
+from tensorflow import keras
 
 app = Flask(__name__)
 
-# Cargar labels
-with open(LABELS_PATH, "r", encoding="utf-8") as f:
-    LABELS = json.load(f)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "digit_model.h5")
+LABELS_PATH = os.path.join(BASE_DIR, "labels.json")
 
-print("BASE_DIR:", BASE_DIR)
-print("Archivos en BASE_DIR:", os.listdir(BASE_DIR))
-print("Existe el modelo?:", os.path.exists(MODEL_PATH))
+# Cargar el modelo y la configuración (img_size, class_names) una sola vez al iniciar
+model = keras.models.load_model(MODEL_PATH)
 
-# Cargar modelo
-MODEL = load_model(MODEL_PATH)
+with open(LABELS_PATH, "r") as f:
+    config = json.load(f)
+
+IMG_SIZE = config["img_size"]
+CLASS_NAMES = config["class_names"]
 
 
 @app.route("/")
@@ -35,28 +31,35 @@ def predict():
     data = request.get_json(silent=True)
 
     if not data or "pixels" not in data:
-        return jsonify({"error": "Falta 'pixels' en el body"}), 400
+        return jsonify({"error": "Falta el campo 'pixels' en el request"}), 400
 
     pixels = data["pixels"]
+    expected_len = IMG_SIZE * IMG_SIZE
 
-    if len(pixels) != IMG_SIZE * IMG_SIZE:
+    if len(pixels) != expected_len:
         return jsonify({
-            "error": f"Se esperaban {IMG_SIZE*IMG_SIZE} valores, llegaron {len(pixels)}"
+            "error": f"Se esperaban {expected_len} pixeles ({IMG_SIZE}x{IMG_SIZE}), llegaron {len(pixels)}"
         }), 400
 
-    x = np.array(pixels, dtype="float32").reshape(1, IMG_SIZE, IMG_SIZE)
+    # pixels llega en escala 0-255 desde el canvas -> normalizar igual que en entrenamiento
+    image = np.array(pixels, dtype="float32").reshape(1, IMG_SIZE, IMG_SIZE) / 255.0
 
-    y_pred = MODEL.predict(x, verbose=0)
-    pred_class = int(np.argmax(y_pred, axis=1)[0])
-    pred_label = LABELS[str(pred_class)]
+    predictions = model.predict(image, verbose=0)[0]
+    predicted_index = int(np.argmax(predictions))
+
+    probabilities = {
+        CLASS_NAMES[i]: float(round(prob, 4))
+        for i, prob in enumerate(predictions)
+    }
 
     return jsonify({
-        "class": pred_class,
-        "label": pred_label,
-        "probs": y_pred.tolist()[0]
+        "digit": CLASS_NAMES[predicted_index],
+        "confidence": float(round(predictions[predicted_index], 4)),
+        "probabilities": probabilities
     })
 
 
 if __name__ == "__main__":
+    # Para correr localmente. En Render, gunicorn se encarga de levantar la app (ver Procfile).
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=True)

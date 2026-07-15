@@ -1,71 +1,57 @@
-# GUI · Reconocedor de dígitos (16×16)
+# Reconocimiento de Dígitos Manuscritos
 
-Interfaz web para probar el modelo entrenado en el notebook `digit_classifier_16x16.ipynb`.
-El usuario dibuja un dígito en un canvas, la página lo reduce a 16×16 en escala de grises
-(normalizado 0–1, igual que en el entrenamiento) y el modelo lo clasifica **completamente en
-el navegador** con TensorFlow.js (no necesita backend ni servidor de inferencia).
+App web (Flask) que sirve una GUI de dibujo y predice el dígito (0-9) usando un modelo
+entrenado con MNIST redimensionado a 16x16.
 
-## 1. Generar el modelo para la web
-
-En el notebook, después de entrenar, corre la última celda (exportación a TensorFlow.js).
-Esto crea una carpeta `tfjs_model/` con:
+## Estructura del proyecto
 
 ```
-tfjs_model/
-├── model.json
-└── group1-shard1of1.bin   (puede haber más de un .bin según el tamaño)
+digit-recognizer/
+├── app.py                 # Backend Flask (sirve la GUI y el endpoint /predict)
+├── digit_model.h5          # Modelo entrenado (generado por el notebook)
+├── labels.json             # img_size y class_names (generado por el notebook)
+├── templates/
+│   └── index.html          # GUI: canvas para dibujar + JS de predicción
+├── requirements.txt
+├── Procfile                 # Comando de arranque para Render (gunicorn)
+└── README.md
 ```
 
-## 2. Colocar el modelo en el proyecto web
-
-Copia **el contenido** de `tfjs_model/` dentro de la carpeta `model/` de este proyecto, de forma
-que quede así:
-
-```
-web_gui/
-├── index.html
-├── README.md
-└── model/
-    ├── model.json
-    └── group1-shard1of1.bin
-```
-
-`index.html` ya está configurado para cargar `model/model.json` con
-`tf.loadLayersModel("model/model.json")`.
-
-## 3. Probarlo localmente (opcional)
-
-Los navegadores bloquean `fetch` sobre `file://`, así que sirve la carpeta con un servidor simple:
+## Correr localmente
 
 ```bash
-cd web_gui
-python3 -m http.server 8000
+pip install -r requirements.txt
+python app.py
 ```
 
-Y abre `http://localhost:8000`.
+Abrir en el navegador: http://localhost:5000
 
-## 4. Subir a GitHub Pages
+## Subir a GitHub
 
-1. Sube esta carpeta (`web_gui/`) a un repositorio de GitHub.
-2. En el repo: **Settings → Pages → Source**, selecciona la rama (por ejemplo `main`) y la carpeta
-   raíz (o `/docs` si renombras la carpeta a `docs`).
-3. GitHub te da una URL tipo `https://tuusuario.github.io/turepo/`. Ábrela en la tablet del profe.
+```bash
+git init
+git add .
+git commit -m "Digit recognizer app"
+git branch -M main
+git remote add origin https://github.com/<tu-usuario>/<tu-repo>.git
+git push -u origin main
+```
 
-## 5. Alternativa: Render (Static Site)
+Asegúrate de que `digit_model.h5` y `labels.json` (generados al final del notebook)
+estén dentro de esta misma carpeta antes de subir.
 
-1. Sube el repo a GitHub (igual que arriba).
-2. En Render: **New → Static Site**, conecta el repo.
-3. **Build Command:** (vacío, no hay build)
-4. **Publish Directory:** `web_gui` (o `.` si el repo solo contiene esta carpeta)
-5. Deploy. Render te da una URL pública lista para abrir en cualquier dispositivo, incluyendo tablet.
+## Desplegar en Render
 
-## Cómo funciona la predicción
+1. Entra a https://render.com y crea un **New Web Service**.
+2. Conecta el repositorio de GitHub que acabas de subir.
+3. Configuración:
+   - **Environment**: Python
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `gunicorn app:app` (ya está en el `Procfile`, Render lo detecta solo)
+4. Deploy. Render te da un link tipo `https://tu-app.onrender.com` — ese es el que abres
+   en la tablet del profe.
 
-- El canvas de dibujo es de fondo negro y trazo blanco, igual que las imágenes de MNIST
-  (dígito claro sobre fondo oscuro).
-- Al soltar el lápiz/dedo, se dispara una predicción automática (con un pequeño debounce);
-  también puedes forzarla con el botón **Predecir**.
-- El trazo se reescala a 16×16 con un canvas oculto, se convierte a escala de grises promediando
-  R/G/B, y se normaliza dividiendo entre 255 antes de pasarlo al modelo — el mismo pipeline que
-  se usó al entrenar.
-- Se muestra el dígito con mayor probabilidad y un desglose de las 5 clases más probables.
+### Nota sobre el plan gratuito de Render
+
+El plan free "duerme" el servicio tras un rato de inactividad; el primer request después
+de eso puede tardar ~30-50 segundos en responder mientras arranca. Es normal, no es un error.
