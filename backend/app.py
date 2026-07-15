@@ -25,6 +25,14 @@ with open(LABELS_PATH, "r") as f:
 IMG_SIZE = config["img_size"]
 CLASS_NAMES = config["class_names"]
 
+# "Calentar" el modelo con una predicción falsa apenas arranca el servidor.
+# La primera vez que se llama a model.predict(), TensorFlow traza el grafo de cálculo
+# internamente y eso puede tardar mucho (30-90s en un CPU limitado como el del plan free
+# de Render). Si esto pasa aquí, en el arranque, el usuario nunca lo sufre.
+_dummy_input = np.zeros((1, IMG_SIZE, IMG_SIZE), dtype="float32")
+model.predict(_dummy_input, verbose=0)
+print("Modelo precalentado y listo para predecir")
+
 
 @app.route("/")
 def health():
