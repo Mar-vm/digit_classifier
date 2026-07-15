@@ -17,6 +17,10 @@ app = Flask(__name__)
 with open(LABELS_PATH, "r", encoding="utf-8") as f:
     LABELS = json.load(f)
 
+print("BASE_DIR:", BASE_DIR)
+print("Archivos en BASE_DIR:", os.listdir(BASE_DIR))
+print("Existe el modelo?:", os.path.exists(MODEL_PATH))
+
 # Cargar modelo
 MODEL = load_model(MODEL_PATH)
 
